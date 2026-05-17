@@ -1,0 +1,36 @@
+name: Build WinFloat
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.cs'
+      - '**.csproj'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: dotnet restore WinFloat.csproj
+    
+    - name: Build
+      run: dotnet build WinFloat.csproj -c Release --no-restore
+    
+    - name: Publish self-contained
+      run: dotnet publish WinFloat.csproj -c Release -r win-x64 --self-contained true -o publish
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: WinFloat-Release
+        path: publish/
