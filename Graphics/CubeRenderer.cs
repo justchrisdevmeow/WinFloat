@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.Numerics;
 using System.Runtime.InteropServices;
 using Assimp;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
-using Vector3 = OpenTK.Mathematics.Vector3;
-using Vector2 = OpenTK.Mathematics.Vector2;
-using Matrix4 = OpenTK.Mathematics.Matrix4;
 
 namespace WinFloat;
 
