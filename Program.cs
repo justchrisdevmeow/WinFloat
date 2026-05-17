@@ -28,7 +28,7 @@ class Program
     }
 }
 
-class MainGame : GameWindow
+public class MainGame : GameWindow  // Made PUBLIC
 {
     // Core components
     private CubeRenderer _renderer;
