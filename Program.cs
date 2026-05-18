@@ -9,6 +9,7 @@ using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
 using Vector2 = OpenTK.Mathematics.Vector2;
 using Vector3 = OpenTK.Mathematics.Vector3;
+using Keys = OpenTK.Windowing.GraphicsLibraryFramework.Keys;
 
 namespace WinFloat;
 
