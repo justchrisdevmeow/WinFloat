@@ -125,26 +125,52 @@ public class CubeRenderer
         _indices.Clear();
         _usingCustomModel = false;
         
-        AddQuad(new Vector3(-0.5f, -0.5f,  0.5f), new Vector3( 0.5f,  0.5f,  0.5f), new Vector2(0,0), new Vector2(1,1));
-        AddQuad(new Vector3(-0.5f, -0.5f, -0.5f), new Vector3( 0.5f,  0.5f, -0.5f), new Vector2(0,0), new Vector2(1,1));
-        AddQuad(new Vector3(-0.5f, -0.5f,  0.5f), new Vector3(-0.5f,  0.5f, -0.5f), new Vector2(0,0), new Vector2(1,1));
-        AddQuad(new Vector3( 0.5f, -0.5f, -0.5f), new Vector3( 0.5f,  0.5f,  0.5f), new Vector2(0,0), new Vector2(1,1));
-        AddQuad(new Vector3(-0.5f,  0.5f,  0.5f), new Vector3( 0.5f,  0.5f, -0.5f), new Vector2(0,0), new Vector2(1,1));
-        AddQuad(new Vector3(-0.5f, -0.5f, -0.5f), new Vector3( 0.5f, -0.5f,  0.5f), new Vector2(0,0), new Vector2(1,1));
+        float size = 0.5f;
+        float[] verts = {
+            // Front face
+            -size, -size,  size, 0, 0,
+             size, -size,  size, 1, 0,
+             size,  size,  size, 1, 1,
+            -size,  size,  size, 0, 1,
+            // Back face
+            -size, -size, -size, 0, 0,
+            -size,  size, -size, 0, 1,
+             size,  size, -size, 1, 1,
+             size, -size, -size, 1, 0,
+            // Top face
+            -size,  size, -size, 0, 0,
+            -size,  size,  size, 0, 1,
+             size,  size,  size, 1, 1,
+             size,  size, -size, 1, 0,
+            // Bottom face
+            -size, -size, -size, 0, 0,
+             size, -size, -size, 1, 0,
+             size, -size,  size, 1, 1,
+            -size, -size,  size, 0, 1,
+            // Right face
+             size, -size, -size, 0, 0,
+             size,  size, -size, 0, 1,
+             size,  size,  size, 1, 1,
+             size, -size,  size, 1, 0,
+            // Left face
+            -size, -size, -size, 0, 0,
+            -size, -size,  size, 1, 0,
+            -size,  size,  size, 1, 1,
+            -size,  size, -size, 0, 1
+        };
+        _vertices.AddRange(verts);
+        
+        uint[] idxs = {
+            0,1,2, 0,2,3,    // front
+            4,5,6, 4,6,7,    // back
+            8,9,10, 8,10,11, // top
+            12,13,14, 12,14,15, // bottom
+            16,17,18, 16,18,19, // right
+            20,21,22, 20,22,23  // left
+        };
+        _indices.AddRange(idxs);
         
         if (_vertexArray != 0) UploadGeometry();
-    }
-
-    private void AddQuad(Vector3 min, Vector3 max, Vector2 uvMin, Vector2 uvMax)
-    {
-        uint startIndex = (uint)_vertices.Count / 5;
-        _vertices.AddRange(new float[] { min.X, min.Y, max.Z, uvMin.X, uvMin.Y });
-        _vertices.AddRange(new float[] { max.X, min.Y, max.Z, uvMax.X, uvMin.Y });
-        _vertices.AddRange(new float[] { max.X, max.Y, max.Z, uvMax.X, uvMax.Y });
-        _vertices.AddRange(new float[] { min.X, min.Y, max.Z, uvMin.X, uvMin.Y });
-        _vertices.AddRange(new float[] { max.X, max.Y, max.Z, uvMax.X, uvMax.Y });
-        _vertices.AddRange(new float[] { min.X, max.Y, max.Z, uvMin.X, uvMax.Y });
-        for (uint i = 0; i < 6; i++) _indices.Add(startIndex + i);
     }
 
     private void BuildSphere(float radius, int segments)
@@ -345,7 +371,11 @@ public class CubeRenderer
             }
             UploadGeometry();
         }
-        catch (Exception ex) { Console.WriteLine($"Load model failed: {ex.Message}"); }
+        catch (Exception ex) 
+        { 
+            Console.WriteLine($"Load model failed: {ex.Message}");
+            throw;
+        }
     }
 
     public void Render()
@@ -375,16 +405,27 @@ public class CubeRenderer
     private void UpdateModelMatrix()
     {
         _modelMatrix = Matrix4.CreateTranslation(_position);
-        if (_currentAnimation == 1)
-            _modelMatrix *= Matrix4.CreateRotationY(_animationTime * 2f) * Matrix4.CreateRotationX(_animationTime * 1.3f);
-        else if (_currentAnimation == 2)
-            _modelMatrix *= Matrix4.CreateTranslation(0, (float)Math.Sin(_animationTime * 3f) * 0.2f, 0);
-        else if (_currentAnimation == 3)
-            _modelMatrix *= Matrix4.CreateScale(1f + (float)Math.Sin(_animationTime * 4f) * 0.1f);
-        else if (_currentAnimation == 4)
+        
+        if (_currentAnimation == 1) // Spin - rotates in place
+        {
+            _modelMatrix *= Matrix4.CreateRotationY(_animationTime * 2f);
+            _modelMatrix *= Matrix4.CreateRotationX(_animationTime * 1.3f);
+        }
+        else if (_currentAnimation == 2) // Bounce
+        {
+            float offsetY = (float)Math.Sin(_animationTime * 3f) * 0.2f;
+            _modelMatrix *= Matrix4.CreateTranslation(0, offsetY, 0);
+        }
+        else if (_currentAnimation == 3) // Pulse
+        {
+            float scale = 1f + (float)Math.Sin(_animationTime * 4f) * 0.1f;
+            _modelMatrix *= Matrix4.CreateScale(scale);
+        }
+        else if (_currentAnimation == 4) // Wobble
         {
             float angle = (float)Math.Sin(_animationTime * 2f) * 0.2f;
-            _modelMatrix *= Matrix4.CreateRotationZ(angle) * Matrix4.CreateRotationX(angle * 0.5f);
+            _modelMatrix *= Matrix4.CreateRotationZ(angle);
+            _modelMatrix *= Matrix4.CreateRotationX(angle * 0.5f);
         }
     }
 
@@ -399,6 +440,5 @@ public class CubeRenderer
     public void SetAnimation(int animation, float time) { _currentAnimation = animation; _animationTime = time; }
     public void SetCubePosition(Vector3 position) => _position = position;
     public Vector3 GetCubePosition() => _position;
-    public void MoveCube(Vector2 mouseDelta) => _position += new Vector3(mouseDelta.X * 0.01f, -mouseDelta.Y * 0.01f, 0);
     public void Unload() { GL.DeleteBuffer(_vertexBuffer); GL.DeleteBuffer(_indexBuffer); GL.DeleteVertexArray(_vertexArray); GL.DeleteProgram(_shaderProgram); }
 }
