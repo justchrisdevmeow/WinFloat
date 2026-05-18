@@ -7,9 +7,9 @@ using OpenTK.Windowing.Desktop;
 using OpenTK.Windowing.GraphicsLibraryFramework;
 using OpenTK.Mathematics;
 using OpenTK.Graphics.OpenGL4;
+using Keys = OpenTK.Windowing.GraphicsLibraryFramework.Keys;
 using Vector2 = OpenTK.Mathematics.Vector2;
 using Vector3 = OpenTK.Mathematics.Vector3;
-using Keys = OpenTK.Windowing.GraphicsLibraryFramework.Keys;
 
 namespace WinFloat;
 
@@ -38,8 +38,11 @@ public class MainGame : GameWindow
     private Physics _physics = null!;
     private Form _controlPanel = null!;
     private ListBox _windowList = null!;
-    private Button _captureBtn = null!, _chaosBtn = null!, _resetBtn = null!;
-    private ComboBox _shapeCombo = null!, _animationCombo = null!;
+    private Button _captureBtn = null!;
+    private Button _chaosBtn = null!;
+    private Button _resetBtn = null!;
+    private ComboBox _shapeCombo = null!;
+    private ComboBox _animationCombo = null!;
     private TrackBar _speedSlider = null!;
     private CheckBox _liveCheck = null!;
     private Label _statusLabel = null!;
@@ -55,6 +58,12 @@ public class MainGame : GameWindow
     private float _chaosTimer = 0f;
     private Random _random = new Random();
     private float _deltaTime;
+    
+    // Mouse dragging
+    private bool _isDragging = false;
+    private Vector2 _lastMousePos;
+    private Vector2 _dragStartPos;
+    private bool _wasMouseDown = false;
 
     public MainGame(GameWindowSettings gameSettings, NativeWindowSettings nativeSettings)
         : base(gameSettings, nativeSettings)
@@ -90,42 +99,46 @@ public class MainGame : GameWindow
             TopMost = true
         };
         
-        // Window list
+        // Prevent closing - hide instead
+        _controlPanel.FormClosing += (s, e) => 
+        {
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                _controlPanel.Hide();
+                SetStatus("Control panel hidden (reopen not implemented)");
+            }
+        };
+        
         var listLabel = new Label { Text = "Open Windows:", Location = new Point(10, 10), Size = new Size(280, 20) };
         _windowList = new ListBox { Location = new Point(10, 30), Size = new Size(280, 150) };
         _windowList.SelectedIndexChanged += OnWindowSelected;
         
-        // Capture button
         _captureBtn = new Button { Text = "Capture Selected", Location = new Point(10, 190), Size = new Size(135, 30) };
         _captureBtn.Click += (s, e) => CaptureSelectedWindow();
         
         var refreshBtn = new Button { Text = "Refresh List", Location = new Point(155, 190), Size = new Size(135, 30) };
         refreshBtn.Click += (s, e) => RefreshWindowList();
         
-        // Live capture checkbox
         _liveCheck = new CheckBox { Text = "Live Capture", Location = new Point(10, 230), Size = new Size(100, 20), Checked = true };
         _liveCheck.CheckedChanged += (s, e) => { _liveCapture = _liveCheck.Checked; SetStatus(_liveCapture ? "Live Capture ON" : "Static Capture ON"); };
         
-        // Shape combo
         var shapeLabel = new Label { Text = "Shape:", Location = new Point(10, 260), Size = new Size(50, 20) };
         _shapeCombo = new ComboBox { Location = new Point(70, 258), Size = new Size(200, 25), DropDownStyle = ComboBoxStyle.DropDownList };
         _shapeCombo.Items.AddRange(new[] { "Cube", "Sphere", "Torus", "Cylinder", "Plane" });
         _shapeCombo.SelectedIndex = 0;
         _shapeCombo.SelectedIndexChanged += (s, e) => { _currentShape = _shapeCombo.SelectedIndex; _renderer.SetShape(_currentShape); };
         
-        // Animation combo
         var animLabel = new Label { Text = "Animation:", Location = new Point(10, 290), Size = new Size(60, 20) };
         _animationCombo = new ComboBox { Location = new Point(70, 288), Size = new Size(200, 25), DropDownStyle = ComboBoxStyle.DropDownList };
         _animationCombo.Items.AddRange(new[] { "None", "Spin", "Bounce", "Pulse", "Wobble" });
         _animationCombo.SelectedIndex = 0;
         _animationCombo.SelectedIndexChanged += (s, e) => { _currentAnimation = _animationCombo.SelectedIndex; _animationTime = 0; };
         
-        // Speed slider
         var speedLabel = new Label { Text = "Speed:", Location = new Point(10, 320), Size = new Size(50, 20) };
         _speedSlider = new TrackBar { Location = new Point(70, 318), Size = new Size(200, 30), Minimum = 25, Maximum = 300, Value = 100 };
         _speedSlider.ValueChanged += (s, e) => { _animationSpeed = _speedSlider.Value / 100f; SetStatus($"Speed: {_animationSpeed:F2}x"); };
         
-        // Buttons
         _chaosBtn = new Button { Text = "Chaos Mode", Location = new Point(10, 360), Size = new Size(135, 30), BackColor = Color.Orange };
         _chaosBtn.Click += (s, e) => { _chaosMode = !_chaosMode; SetStatus(_chaosMode ? "CHAOS MODE ACTIVE" : "Chaos stopped"); };
         
@@ -135,10 +148,8 @@ public class MainGame : GameWindow
         var loadModelBtn = new Button { Text = "Load Custom Model", Location = new Point(10, 400), Size = new Size(280, 30) };
         loadModelBtn.Click += (s, e) => LoadCustomModel();
         
-        // Status label
         _statusLabel = new Label { Text = "Ready", Location = new Point(10, 440), Size = new Size(280, 20), ForeColor = Color.Green };
         
-        // Add controls to form
         _controlPanel.Controls.AddRange(new Control[] { listLabel, _windowList, _captureBtn, refreshBtn, _liveCheck, shapeLabel, _shapeCombo, animLabel, _animationCombo, speedLabel, _speedSlider, _chaosBtn, _resetBtn, loadModelBtn, _statusLabel });
         
         _controlPanel.Show();
@@ -152,7 +163,7 @@ public class MainGame : GameWindow
             _windowList.Items.Add(w.Title);
     }
     
-    private void OnWindowSelected(object sender, EventArgs e)
+    private void OnWindowSelected(object? sender, EventArgs e)
     {
         if (_windowList.SelectedIndex >= 0 && _windowList.SelectedIndex < _windows.Count)
             CaptureSelectedWindow();
@@ -177,8 +188,15 @@ public class MainGame : GameWindow
         };
         if (dialog.ShowDialog() == DialogResult.OK)
         {
-            _renderer.LoadCustomModel(dialog.FileName);
-            SetStatus($"Loaded: {System.IO.Path.GetFileName(dialog.FileName)}");
+            try
+            {
+                _renderer.LoadCustomModel(dialog.FileName);
+                SetStatus($"Loaded: {System.IO.Path.GetFileName(dialog.FileName)}");
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"ERROR: {ex.Message}");
+            }
         }
     }
     
@@ -230,19 +248,52 @@ public class MainGame : GameWindow
     protected override void OnUpdateFrame(FrameEventArgs args)
     {
         base.OnUpdateFrame(args);
+        
+        // Mouse drag to move cube
+        var mouseState = MouseState;
+        var mousePos = new Vector2(MousePosition.X, MousePosition.Y);
+        
+        if (mouseState.IsButtonDown(MouseButton.Left))
+        {
+            if (!_wasMouseDown)
+            {
+                _isDragging = true;
+                _dragStartPos = mousePos;
+                _lastMousePos = mousePos;
+            }
+            else if (_isDragging)
+            {
+                Vector2 delta = mousePos - _lastMousePos;
+                if (delta.LengthSquared > 0.01f)
+                {
+                    var pos = _renderer.GetCubePosition();
+                    pos.X += delta.X * 0.01f;
+                    pos.Y -= delta.Y * 0.01f;
+                    _renderer.SetCubePosition(pos);
+                }
+                _lastMousePos = mousePos;
+            }
+            _wasMouseDown = true;
+        }
+        else
+        {
+            if (_wasMouseDown && _isDragging)
+            {
+                Vector2 dragVector = mousePos - _dragStartPos;
+                float speedX = Math.Clamp(dragVector.X * 0.05f, -8f, 8f);
+                float speedY = Math.Clamp(dragVector.Y * 0.05f, -8f, 8f);
+                _physics.Throw(speedX, speedY);
+            }
+            _isDragging = false;
+            _wasMouseDown = false;
+        }
+        
+        // Keyboard controls
         var keyboard = KeyboardState;
         if (keyboard.IsKeyPressed(Keys.Space)) { _chaosMode = !_chaosMode; SetStatus(_chaosMode ? "CHAOS MODE" : "Chaos stopped"); }
         if (keyboard.IsKeyPressed(Keys.R)) { _physics.ResetPosition(); _renderer.SetCubePosition(Vector3.Zero); SetStatus("Position reset"); }
         if (keyboard.IsKeyPressed(Keys.Escape)) { _controlPanel.Close(); Close(); }
     }
-
-    public void ThrowCube(float velocityX, float velocityY)
-    {
-        _physics.Throw(velocityX, velocityY);
-        SetStatus("Thrown!");
-    }
-    
-    public CubeRenderer GetRenderer() => _renderer;
 
     protected override void OnResize(ResizeEventArgs e)
     {
@@ -255,5 +306,11 @@ public class MainGame : GameWindow
         _controlPanel?.Close();
         _renderer?.Unload();
         base.OnUnload();
+    }
+    
+    public void ThrowCube(float velocityX, float velocityY)
+    {
+        _physics.Throw(velocityX, velocityY);
+        SetStatus("Thrown!");
     }
 }
