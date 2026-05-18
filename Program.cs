@@ -33,16 +33,16 @@ class Program
 
 public class MainGame : GameWindow
 {
-    private CubeRenderer _renderer;
-    private WindowCapture _capture;
-    private Physics _physics;
-    private Form _controlPanel;
-    private ListBox _windowList;
-    private Button _captureBtn, _chaosBtn, _resetBtn;
-    private ComboBox _shapeCombo, _animationCombo;
-    private TrackBar _speedSlider;
-    private CheckBox _liveCheck;
-    private Label _statusLabel;
+    private CubeRenderer _renderer = null!;
+    private WindowCapture _capture = null!;
+    private Physics _physics = null!;
+    private Form _controlPanel = null!;
+    private ListBox _windowList = null!;
+    private Button _captureBtn = null!, _chaosBtn = null!, _resetBtn = null!;
+    private ComboBox _shapeCombo = null!, _animationCombo = null!;
+    private TrackBar _speedSlider = null!;
+    private CheckBox _liveCheck = null!;
+    private Label _statusLabel = null!;
     
     private List<WindowCapture.WindowInfo> _windows = new();
     private IntPtr _selectedWindowHandle = IntPtr.Zero;
